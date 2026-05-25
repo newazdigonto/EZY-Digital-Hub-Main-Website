@@ -1,0 +1,381 @@
+@import url('https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --eh-orange: #F7931E;
+  --eh-orange-hover: #B43E00;
+  --eh-bg-dark: #061329;
+  --eh-bg-light: #F5F5F5;
+  --eh-navy: #0D2559;
+  --eh-text-dark: #1F2937;
+  --eh-text-light: #FFFFFF;
+  --eh-border-gray: #D1D5DB;
+}
+
+@theme {
+  --font-sans: "Bai Jamjuree", system-ui, sans-serif;
+  --font-siliguri: "Hind Siliguri", sans-serif;
+  --font-jamjuree: "Bai Jamjuree", sans-serif;
+  
+  --color-orange-500: #F7931E;
+  --color-orange-600: #E65F00;
+  --color-orange-700: #B43E00;
+  
+  --color-brand-orange: #F7931E;
+  --color-brand-navy: #0D2559;
+  --color-brand-dark: #061329;
+  --color-brand-light: #F5F5F5;
+  --color-brand-text-dark: #1F2937;
+  --color-brand-text-light: #FFFFFF;
+  --color-brand-border-gray: #D1D5DB;
+  --color-brand-hover-orange: #B43E00;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--eh-bg-light);
+  color: var(--eh-text-dark);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.dark {
+  background-color: var(--eh-bg-dark);
+  color: var(--eh-text-light);
+}
+
+h1, h2, h3, h4, h5, h6,
+button, .font-jamjuree {
+  font-family: var(--font-jamjuree), sans-serif;
+}
+
+.font-siliguri {
+  font-family: var(--font-siliguri), sans-serif !important;
+}
+
+/* Dynamic theme adaptations */
+body.light section,
+body.light nav,
+body.light footer {
+  background-color: var(--eh-bg-light) !important;
+  color: var(--eh-text-dark) !important;
+}
+
+body.light .bg-\[\#0a0a0a\] {
+  background-color: var(--eh-bg-light) !important;
+}
+
+body.light .bg-black {
+  background-color: #ffffff !important;
+}
+
+body.light .bg-\[\#0a0a0add\]\/95 {
+  background-color: rgba(245, 245, 245, 0.9) !important;
+}
+
+body.light .bg-\[\#0e0e0e\] {
+  background-color: #e9ecef !important;
+}
+
+body.light .bg-\[\#111\] {
+  background-color: #ffffff !important;
+}
+
+body.light .bg-\[\#161616\]\/90 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+body.light .bg-\[\#131313\] {
+  background-color: #ffffff !important;
+}
+
+body.light .bg-\[\#0d0d0d\] {
+  background-color: #e9ecef !important;
+}
+
+body.light .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+body.light .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light .text-white {
+  color: var(--eh-text-dark) !important;
+}
+
+body.light .text-gray-400 {
+  color: #4b5563 !important;
+}
+
+body.light .text-gray-305,
+body.light .text-gray-300 {
+  color: #374151 !important;
+}
+
+body.light .text-gray-200 {
+  color: var(--eh-text-dark) !important;
+}
+
+body.light .text-slate-300 {
+  color: #475569 !important;
+}
+
+body.light .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+body.light .border-white\/5,
+body.light .border-white\/10,
+body.light .border-white\/20 {
+  border-color: var(--eh-border-gray) !important;
+}
+
+body.light .glow-box {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: var(--eh-border-gray) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05) !important;
+  color: var(--eh-text-dark) !important;
+}
+
+body.light .service-mini-card {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: var(--eh-border-gray) !important;
+}
+
+body.light .service-mini-card span {
+  color: var(--eh-text-dark) !important;
+}
+
+body.light .service-mini-card:hover {
+  border-color: var(--eh-orange) !important;
+  background: rgba(247, 147, 30, 0.05) !important;
+}
+
+body.light .border-orange-700\/50 {
+  border-color: rgba(247, 147, 30, 0.3) !important;
+}
+
+body.light h1,
+body.light h2,
+body.light h3,
+body.light h4,
+body.light h5,
+body.light h6 {
+  color: #000000 !important;
+}
+
+body.light h1 span.ez-gradient-text,
+body.light h2 span.ez-gradient-text,
+body.light .ez-gradient-text {
+  background: #000000 !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+body.light .selection\:text-white::selection {
+  color: #ffffff !important;
+}
+
+/* Ensure ALL orange filled buttons and element texts requested to be white REMAIN pristine #FFFFFF white in light mode */
+body.light button.bg-orange-600,
+body.light button.bg-orange-500,
+body.light button.bg-orange-700,
+body.light button.bg-\[\#ff8c00\],
+body.light a.bg-\[\#ff8c00\],
+body.light button[class*="bg-orange"],
+body.light a[class*="bg-orange"],
+body.light .bg-orange-600,
+body.light .bg-orange-500,
+body.light .bg-orange-700,
+body.light button.text-white.bg-orange-600,
+body.light button.text-white.bg-orange-500,
+body.light button.text-white.bg-orange-700,
+body.light a.text-white.bg-orange-600,
+body.light a.text-white.bg-orange-500,
+body.light a.text-white.bg-orange-700,
+body.light .bg-\[\#25d366\],
+body.light .bg-orange-600 *,
+body.light .bg-orange-500 *,
+body.light .bg-orange-700 *,
+body.light button[class*="bg-orange"] *,
+body.light a[class*="bg-orange"] *,
+body.light .bg-brand-orange *,
+body.light .marquee-strip * {
+  color: #ffffff !important;
+}
+
+body.light button.bg-orange-600 svg,
+body.light button.bg-orange-500 svg,
+body.light button.bg-orange-700 svg,
+body.light button[class*="bg-orange"] svg,
+body.light button.bg-brand-orange svg,
+body.light .bg-orange-600 svg,
+body.light .bg-orange-500 svg,
+body.light .bg-orange-700 svg,
+body.light button[class*="bg-orange"] * svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Modal and calendar specific slot overlays in light mode */
+body.light .bg-black\/50,
+body.light .bg-black\/40,
+body.light .bg-black\/30 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: var(--eh-text-dark) !important;
+  border-color: var(--eh-border-gray) !important;
+}
+
+body.light .bg-black\/50:hover,
+body.light .bg-black\/40:hover,
+body.light .bg-black\/30:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Immersive UI Specific Classes */
+.ez-gradient-text {
+  background: linear-gradient(135deg, #F7931E, #B43E00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glow-box {
+  border: 1px solid rgba(247, 147, 30, 0.25);
+  background: rgba(13, 37, 89, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.marquee-strip {
+  background: linear-gradient(135deg, #E65F00, #B43E00);
+  padding: 6px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Dark Mode Navy Blue Brand Layout Mapping overrides */
+body:not(.light),
+body.dark {
+  background-color: #061329 !important;
+}
+
+body:not(.light) section,
+body:not(.light) nav,
+body:not(.light) footer {
+  background-color: #061329 !important;
+}
+
+body:not(.light) .bg-\[\#0a0a0a\] {
+  background-color: #061329 !important;
+}
+
+body:not(.light) .bg-black {
+  background-color: #040c1b !important;
+}
+
+body:not(.light) .bg-\[\#0a0a0add\]\/95 {
+  background-color: rgba(6, 19, 41, 0.95) !important;
+}
+
+body:not(.light) .bg-\[\#0e0e0e\] {
+  background-color: #091a38 !important;
+}
+
+body:not(.light) .bg-\[\#111\] {
+  background-color: #0d2559 !important;
+}
+
+body:not(.light) .bg-\[\#161616\]\/90 {
+  background-color: rgba(13, 37, 89, 0.9) !important;
+}
+
+body:not(.light) .bg-\[\#131313\] {
+  background-color: #0d2559 !important;
+}
+
+body:not(.light) .bg-\[\#0d0d0d\] {
+  background-color: #091a38 !important;
+}
+
+body:not(.light) .glow-box {
+  background: rgba(13, 37, 89, 0.45) !important;
+  border-color: rgba(247, 147, 30, 0.25) !important;
+}
+
+body:not(.light) .service-mini-card {
+  background: rgba(13, 37, 89, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body:not(.light) .service-mini-card:hover {
+  border-color: #F7931E !important;
+  background: rgba(247, 147, 30, 0.08) !important;
+}
+
+.service-mini-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: all 0.3s ease;
+}
+
+.service-mini-card:hover {
+  border-color: var(--eh-orange);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* GPU Accelerated Marquees and Keyframes */
+@keyframes marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes marqueeSlider {
+  0%, 15% {
+    transform: translate3d(0, 0, 0);
+  }
+  20%, 35% {
+    transform: translate3d(-20%, 0, 0);
+  }
+  40%, 55% {
+    transform: translate3d(-40%, 0, 0);
+  }
+  60%, 75% {
+    transform: translate3d(-60%, 0, 0);
+  }
+  80%, 95% {
+    transform: translate3d(-80%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

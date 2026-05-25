@@ -1,0 +1,6 @@
+{
+  "name": "Ezy Digital Hub",
+  "description": "Premium Digital Agency specializing in high-performance web architecture, brand identity, digital marketing, and AI content creation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
