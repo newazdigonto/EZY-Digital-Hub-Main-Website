@@ -27,7 +27,15 @@ import {
   Send,
   Eye,
   CheckCircle2,
-  PlusCircle
+  PlusCircle,
+  Printer,
+  Filter,
+  Upload,
+  Search,
+  Image as ImageIcon,
+  FileSpreadsheet,
+  RefreshCw,
+  CheckSquare
 } from "lucide-react";
 import { Language } from "../types";
 
@@ -81,7 +89,8 @@ export default function Dashboard({
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
     website: true,
     clients: true,
-    payment: true
+    payment: true,
+    admin_costing_menu: true
   });
 
   const toggleMenu = (menu: string) => {
@@ -99,6 +108,9 @@ export default function Dashboard({
   const [invoices, setInvoices] = useState<any[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
+  // Administrative Costing Store
+  const [adminCosts, setAdminCosts] = useState<any[]>([]);
+
   // Selected invoice for details popup
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
 
@@ -113,6 +125,32 @@ export default function Dashboard({
   const [adForm, setAdForm] = useState({ campaignName: "", platform: "Facebook Ads", spend: "", conversions: "", date: "2026-05" });
   const [subForm, setSubForm] = useState({ clientName: "", plan: "Premium Retainer", amount: "", nextBilling: "2026-06-01", status: "Active" });
   const [invForm, setInvForm] = useState({ clientName: "", itemName: "", price: "", qty: "1", status: "Unpaid" });
+
+  // Administrative Costing Form state
+  const [costForm, setCostForm] = useState({
+    category: "Office rent",
+    description: "",
+    amount: "",
+    date: new Date().toISOString().substring(0, 10),
+    resourcePerson: "",
+    shopName: "",
+    invoiceDate: new Date().toISOString().substring(0, 10),
+    invoiceNumber: "",
+    invoicePhoto: ""
+  });
+
+  // Cost Filtering state
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterMonth, setFilterMonth] = useState("All");
+  const [filterDay, setFilterDay] = useState("");
+
+  // Printable aggregate costs trigger
+  const [printCostReport, setPrintCostReport] = useState<boolean>(false);
+
+  // Invoice Audit Search or categorisation parameters
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditStatusFilter, setAuditStatusFilter] = useState("All");
+  const [auditCategoryFilter, setAuditCategoryFilter] = useState("All");
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -214,6 +252,21 @@ export default function Dashboard({
       ];
       localStorage.setItem("ezydigital_history", JSON.stringify(data));
       setPaymentHistory(data);
+    }
+
+    // Load initial administrative costing database
+    const savedAdminCosts = localStorage.getItem("ezydigital_admin_costs");
+    if (savedAdminCosts) {
+      setAdminCosts(JSON.parse(savedAdminCosts));
+    } else {
+      const initialCosts = [
+        { id: "ac_1", category: "Office rent", description: "Baitul Aman Tower Rent - February 2026", amount: 35000, date: "2026-02-01", resourcePerson: "Md. Newaz", shopName: "Tower Management Ltd", invoiceDate: "2026-02-01", invoiceNumber: "BAT-99018", invoicePhoto: "" },
+        { id: "ac_2", category: "Hardware buy", description: "Mechanical Keyboard buy for developer", amount: 4500, date: "2026-02-12", resourcePerson: "Sadman Sakib", shopName: "Ryans Computers", invoiceDate: "2026-02-12", invoiceNumber: "RY-7721", invoicePhoto: "" },
+        { id: "ac_3", category: "Mouse buy", description: "Logitech MX Master mouse for editor", amount: 9500, date: "2026-02-18", resourcePerson: "Amina Rahman", shopName: "Star Tech BD", invoiceDate: "2026-02-18", invoiceNumber: "ST-88122", invoicePhoto: "" },
+        { id: "ac_4", category: "Office rent", description: "Baitul Aman Tower Rent - May 2026", amount: 35000, date: "2026-05-01", resourcePerson: "Md. Newaz", shopName: "Tower Management Ltd", invoiceDate: "2026-05-01", invoiceNumber: "BAT-99020", invoicePhoto: "" }
+      ];
+      localStorage.setItem("ezydigital_admin_costs", JSON.stringify(initialCosts));
+      setAdminCosts(initialCosts);
     }
   }, []);
 
@@ -430,6 +483,90 @@ export default function Dashboard({
     triggerToast("WhatsApp reminder text copied to clipboard!");
   };
 
+  // ADMINISTRATIVE COSTING HANDLERS
+  const handleAddAdminCost = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!costForm.description || !costForm.amount) {
+      alert("Please fill out Description and Amount fields.");
+      return;
+    }
+    const newCost = {
+      id: "ac_" + Date.now(),
+      category: costForm.category,
+      description: costForm.description,
+      amount: Number(costForm.amount) || 0,
+      date: costForm.date,
+      resourcePerson: costForm.resourcePerson || "N/A",
+      shopName: costForm.shopName || "N/A",
+      invoiceDate: costForm.invoiceDate || costForm.date,
+      invoiceNumber: costForm.invoiceNumber || "N/A",
+      invoicePhoto: costForm.invoicePhoto || ""
+    };
+    const updated = [newCost, ...adminCosts];
+    setAdminCosts(updated);
+    syncStore("ezydigital_admin_costs", updated);
+
+    // Reset Form
+    setCostForm({
+      category: "Office rent",
+      description: "",
+      amount: "",
+      date: new Date().toISOString().substring(0, 10),
+      resourcePerson: "",
+      shopName: "",
+      invoiceDate: new Date().toISOString().substring(0, 10),
+      invoiceNumber: "",
+      invoicePhoto: ""
+    });
+    triggerToast("Administrative cost recorded successfully!");
+  };
+
+  const handleDeleteAdminCost = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this administrative cost?")) {
+      const updated = adminCosts.filter(c => c.id !== id);
+      setAdminCosts(updated);
+      syncStore("ezydigital_admin_costs", updated);
+      triggerToast("Administrative cost deleted successfully!");
+    }
+  };
+
+  // INVOICE AUDIT STATUS TOGGLER
+  const toggleInvoiceAuditStatus = (id: string) => {
+    const updated = invoices.map(i => {
+      if (i.id === id) {
+        const nextStatus = i.status === "Paid" ? "Unpaid" : "Paid";
+        
+        // Update payment history if transitioning to Paid, or filter out if transitioning to Unpaid
+        if (nextStatus === "Paid") {
+          const newPay = {
+            id: "pay_" + Date.now(),
+            invoiceNumber: i.invoiceNumber,
+            clientName: i.clientName,
+            amount: i.total,
+            method: "Audit Ledger Clearing",
+            date: new Date().toISOString().substring(0, 10),
+            status: "Success",
+            txid: "AUD_" + Math.floor(10000 + Math.random() * 90000)
+          };
+          const updatedHistory = [newPay, ...paymentHistory];
+          setPaymentHistory(updatedHistory);
+          syncStore("ezydigital_history", updatedHistory);
+        } else {
+          // Remove from history
+          const updatedHistory = paymentHistory.filter(pay => pay.invoiceNumber !== i.invoiceNumber);
+          setPaymentHistory(updatedHistory);
+          syncStore("ezydigital_history", updatedHistory);
+        }
+        
+        return { ...i, status: nextStatus };
+      }
+      return i;
+    });
+    setInvoices(updated);
+    syncStore("ezydigital_invoices", updated);
+    triggerToast("Invoice status audited & synchronized!");
+  };
+
   return (
     <div className="min-h-screen bg-[#061329] text-white flex flex-col font-sans select-none">
       
@@ -476,7 +613,7 @@ export default function Dashboard({
           {/* MENU 1. USER PERMISSIONS */}
           {isSuperAdmin && (
             <div className="space-y-1">
-              <p className="text-[10px] font-black tracking-widest text-[#F7931E] uppercase px-3 mb-1 font-mono">1. User Deck</p>
+              <p className="text-[10px] font-black tracking-widest text-[#F7931E] uppercase px-3 mb-1 font-mono">User Deck</p>
               <button
                 onClick={() => setActiveTab("users")}
                 className={`w-full text-left py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
@@ -495,7 +632,7 @@ export default function Dashboard({
               onClick={() => toggleMenu("website")}
               className="w-full text-left py-1 px-3 text-[10px] font-black tracking-widest text-[#F7931E] uppercase flex items-center justify-between cursor-pointer"
             >
-              <span>2. WEBSITE EDIT CONTENT</span>
+              <span>WEBSITE EDIT CONTENT</span>
               {openMenus.website ? <ChevronDown className="w-3 h-3 text-orange-450" /> : <ChevronRight className="w-3 h-3 text-orange-450" />}
             </button>
 
@@ -569,7 +706,7 @@ export default function Dashboard({
               onClick={() => toggleMenu("clients")}
               className="w-full text-left py-1 px-3 text-[10px] font-black tracking-widest text-[#F7931E] uppercase flex items-center justify-between cursor-pointer"
             >
-              <span>3. CLIENTS LIST</span>
+              <span>CLIENTS LIST</span>
               {openMenus.clients ? <ChevronDown className="w-3 h-3 text-orange-450" /> : <ChevronRight className="w-3 h-3 text-orange-450" />}
             </button>
 
@@ -603,7 +740,7 @@ export default function Dashboard({
               onClick={() => toggleMenu("payment")}
               className="w-full text-left py-1 px-3 text-[10px] font-black tracking-widest text-[#F7931E] uppercase flex items-center justify-between cursor-pointer"
             >
-              <span>4. PAYMENT SYSTEM</span>
+              <span>PAYMENT SYSTEM</span>
               {openMenus.payment ? <ChevronDown className="w-3 h-3 text-orange-450" /> : <ChevronRight className="w-3 h-3 text-orange-450" />}
             </button>
 
@@ -653,6 +790,40 @@ export default function Dashboard({
                 >
                   <History className="w-3.5 h-3.5" />
                   <span>Payment History</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("payment_audit")}
+                  className={`w-full text-left py-2 px-3 rounded-lg text-xs font-bold tracking-wide transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === "payment_audit" ? "bg-orange-600/20 text-[#F7931E] font-black border border-orange-500/30" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Invoice Audit</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* MENU: ADMINISTRATIVE COSTING */}
+          <div className="space-y-1">
+            <button
+              onClick={() => toggleMenu("admin_costing_menu")}
+              className="w-full text-left py-1 px-3 text-[10px] font-black tracking-widest text-[#F7931E] uppercase flex items-center justify-between cursor-pointer"
+            >
+              <span>ADMINISTRATIVE COSTING</span>
+              {openMenus.admin_costing_menu ? <ChevronDown className="w-3 h-3 text-orange-450" /> : <ChevronRight className="w-3 h-3 text-orange-450" />}
+            </button>
+
+            {openMenus.admin_costing_menu && (
+              <div className="pl-3 space-y-0.5 border-l border-white/5 ml-3 font-sans">
+                <button
+                  onClick={() => setActiveTab("admin_costing")}
+                  className={`w-full text-left py-2 px-3 rounded-lg text-xs font-bold tracking-wide transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === "admin_costing" ? "bg-orange-600/20 text-[#F7931E] font-black border border-orange-500/30" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Manage Costing</span>
                 </button>
               </div>
             )}
@@ -1697,102 +1868,942 @@ export default function Dashboard({
             </div>
           )}
 
+          {/* ADMINISTRATIVE COSTING STATE PANEL */}
+          {activeTab === "admin_costing" && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-extrabold uppercase tracking-tight text-white mb-1">Administrative Costing Control</h2>
+                  <p className="text-xs text-gray-400">Manage internal operation expenditures, purchase history of assets, and invoice attachments.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setPrintCostReport(true);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,129,0.2)]"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Generate Cost Statement (Print)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* QUICK NUMERICAL SUMMARY INDEX CARDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Cumulative Spent</span>
+                  <div className="text-2xl font-black text-rose-400">
+                    BDT {adminCosts.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-gray-500">Includes all historic recorded cost groups</p>
+                </div>
+
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">February Expense Group</span>
+                  <div className="text-2xl font-black text-white">
+                    BDT {adminCosts.filter(c => c.date.startsWith("2026-02")).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-gray-500">Specific standard query targeting Feb 2026</p>
+                </div>
+
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Month (May 2026)</span>
+                  <div className="text-2xl font-black text-emerald-400">
+                    BDT {adminCosts.filter(c => c.date.startsWith("2026-05")).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-gray-500">Live operational expenditures</p>
+                </div>
+
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Uploaded Receipts</span>
+                  <div className="text-2xl font-black text-orange-400">
+                    {adminCosts.filter(c => c.invoicePhoto).length} / {adminCosts.length}
+                  </div>
+                  <p className="text-[10px] text-gray-500">Costs with verified paper trials</p>
+                </div>
+              </div>
+
+              {/* CORE SCREEN INTERACTIVES */}
+              <div className="grid lg:grid-cols-12 gap-6">
+                
+                {/* 1. UPLOADER & RECIEPTION ADD FORM */}
+                <form onSubmit={handleAddAdminCost} className="lg:col-span-4 bg-[#091a38] border border-white/10 rounded-2xl p-5 space-y-3.5 h-fit">
+                  <span className="text-xs font-black uppercase text-orange-400 block tracking-wide border-b border-white/5 pb-2 font-mono">Record Administrative Spent</span>
+                  
+                  <div>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Expense Category</label>
+                    <select
+                      value={costForm.category}
+                      onChange={(e) => setCostForm({...costForm, category: e.target.value})}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-orange-500 font-sans"
+                    >
+                      <option value="Office rent">Office rent</option>
+                      <option value="Mouse buy">Mouse buy</option>
+                      <option value="Keyboard buy">Keyboard buy</option>
+                      <option value="Hardware buy">Hardware buy</option>
+                      <option value="Utility bills">Utility bills</option>
+                      <option value="Software subscription">Software subscription</option>
+                      <option value="Marketing campaign">Marketing campaign</option>
+                      <option value="Consultancy cost">Consultancy cost</option>
+                      <option value="Others">Others / Miscellaneous</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Cost Line Description</label>
+                    <input
+                      type="text"
+                      required
+                      value={costForm.description}
+                      onChange={(e) => setCostForm({...costForm, description: e.target.value})}
+                      placeholder="e.g. Mechanical Red Switch Keyboard Buy"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Spent Amount (BDT)</label>
+                      <input
+                        type="number"
+                        required
+                        value={costForm.amount}
+                        onChange={(e) => setCostForm({...costForm, amount: e.target.value})}
+                        placeholder="e.g. 4550"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Date of spent</label>
+                      <input
+                        type="date"
+                        value={costForm.date}
+                        onChange={(e) => setCostForm({...costForm, date: e.target.value})}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-orange-500 font-sans"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Resource Person Name</label>
+                      <input
+                        type="text"
+                        value={costForm.resourcePerson}
+                        onChange={(e) => setCostForm({...costForm, resourcePerson: e.target.value})}
+                        placeholder="e.g. Md. Newaz"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1 font-sans">Shop / Vendor Name</label>
+                      <input
+                        type="text"
+                        value={costForm.shopName}
+                        onChange={(e) => setCostForm({...costForm, shopName: e.target.value})}
+                        placeholder="e.g. Ryans Computers"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1 font-sans">Vendor Invoice Date</label>
+                      <input
+                        type="date"
+                        value={costForm.invoiceDate}
+                        onChange={(e) => setCostForm({...costForm, invoiceDate: e.target.value})}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-orange-500 font-sans"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Invoice Number</label>
+                      <input
+                        type="text"
+                        value={costForm.invoiceNumber}
+                        onChange={(e) => setCostForm({...costForm, invoiceNumber: e.target.value})}
+                        placeholder="e.g. RY-98122"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Store / Upload Invoice Receipt Photo</label>
+                    <div className="mt-1 flex items-center justify-center border-2 border-dashed border-white/10 hover:border-orange-500/50 rounded-xl p-4 transition-all bg-black/20 text-center relative cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setCostForm(prev => ({ ...prev, invoicePhoto: reader.result as string }));
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <div className="space-y-1 text-gray-400 pointer-events-none">
+                        <Upload className="w-5 h-5 mx-auto text-gray-500" />
+                        <p className="text-[10px] font-bold">Upload cost receipt image</p>
+                        <p className="text-[8px] text-gray-500">Supports JPG, PNG with client local base64 storage</p>
+                      </div>
+                    </div>
+                    
+                    {costForm.invoicePhoto && (
+                      <div className="mt-2.5 p-2 bg-black/40 rounded-lg flex items-center justify-between gap-2 border border-orange-500/20">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <ImageIcon className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span className="text-[9px] text-gray-300 truncate font-mono">Receipt encoded (Base64)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCostForm(prev => ({ ...prev, invoicePhoto: "" }))}
+                          className="text-[9px] text-red-400 hover:text-red-300 underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-orange-600 hover:bg-orange-500 text-white font-extrabold text-[10px] uppercase py-2.5 rounded-xl transition-all cursor-pointer text-center tracking-wide"
+                  >
+                    Save Operational Cost record
+                  </button>
+                </form>
+
+                {/* 2. LEDGER GRID WITH INTERACTIVE FILTERS */}
+                <div className="lg:col-span-8 space-y-4">
+                  
+                  {/* SEARCH FILTERS HEADERS */}
+                  <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    
+                    {/* Category filter */}
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Categorise on Spending</label>
+                      <select
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-xs text-white focus:outline-none"
+                      >
+                        <option value="All">All Cost Categories</option>
+                        <option value="Office rent">Office rent</option>
+                        <option value="Mouse buy">Mouse buy</option>
+                        <option value="Keyboard buy">Keyboard buy</option>
+                        <option value="Hardware buy">Hardware buy</option>
+                        <option value="Utility bills">Utility bills</option>
+                        <option value="Software subscription">Software subscription</option>
+                        <option value="Marketing campaign">Marketing campaign</option>
+                        <option value="Consultancy cost">Consultancy cost</option>
+                        <option value="Others">Others / Miscellaneous</option>
+                      </select>
+                    </div>
+
+                    {/* Month by month filter */}
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Filter Month by Month</label>
+                      <select
+                        value={filterMonth}
+                        onChange={(e) => setFilterMonth(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-orange-500 font-sans"
+                      >
+                        <option value="All">All Months (Show all cost)</option>
+                        {Array.from(new Set(adminCosts.map(c => c.date.substring(0, 7)))).sort().reverse().map((m: any) => {
+                          const [year, month] = m.split("-");
+                          const dateObj = new Date(Number(year), Number(month) - 1, 1);
+                          const formattedMonth = dateObj.toLocaleString("en-US", { month: "long", year: "numeric" });
+                          return <option key={m} value={m}>{formattedMonth}</option>;
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Day by day filter */}
+                    <div>
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Filter Day by Day</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={filterDay}
+                          onChange={(e) => setFilterDay(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl p-2 text-xs text-white focus:outline-none"
+                        />
+                        {filterDay && (
+                          <button
+                            onClick={() => setFilterDay("")}
+                            className="absolute right-2.5 top-2 text-[10px] text-gray-400 hover:text-white underline font-bold"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* RESULTS TABLE */}
+                  <div className="bg-[#091a38] border border-white/10 rounded-2xl p-5 overflow-x-auto">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4">
+                      <span className="text-xs font-black uppercase text-orange-400 tracking-wide">Expense Ledger Matrix</span>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        Filtered Results: <strong className="text-white">{
+                          adminCosts.filter(c => {
+                            const matchCategory = filterCategory === "All" || c.category === filterCategory;
+                            const matchMonth = filterMonth === "All" || c.date.substring(0, 7) === filterMonth;
+                            const matchDay = !filterDay || c.date === filterDay;
+                            return matchCategory && matchMonth && matchDay;
+                          }).length
+                        }</strong> records
+                      </span>
+                    </div>
+
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-white/10 text-gray-400 uppercase font-black tracking-wider pb-2">
+                          <th className="py-2.5">Date</th>
+                          <th className="py-2.5">Category</th>
+                          <th className="py-2.5">Description</th>
+                          <th className="py-2.5">Resource Person</th>
+                          <th className="py-2.5 text-right font-mono">Amount (BDT)</th>
+                          <th className="py-2.5 text-center">Receipt</th>
+                          <th className="py-2.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminCosts.filter(c => {
+                          const matchCategory = filterCategory === "All" || c.category === filterCategory;
+                          const matchMonth = filterMonth === "All" || c.date.substring(0, 7) === filterMonth;
+                          const matchDay = !filterDay || c.date === filterDay;
+                          return matchCategory && matchMonth && matchDay;
+                        }).length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="text-center py-10 text-gray-500 italic">
+                              No expense entries matched the defined filter parameters.
+                            </td>
+                          </tr>
+                        ) : (
+                          adminCosts.filter(c => {
+                            const matchCategory = filterCategory === "All" || c.category === filterCategory;
+                            const matchMonth = filterMonth === "All" || c.date.substring(0, 7) === filterMonth;
+                            const matchDay = !filterDay || c.date === filterDay;
+                            return matchCategory && matchMonth && matchDay;
+                          }).map(c => (
+                            <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 text-gray-300">
+                              <td className="py-3 font-mono text-gray-400">{c.date}</td>
+                              <td className="py-3 font-bold">
+                                <span className="bg-orange-500/10 text-[#F7931E] text-[10px] px-2 py-0.5 rounded border border-orange-500/10 whitespace-nowrap">
+                                  {c.category}
+                                </span>
+                              </td>
+                              <td className="py-3 font-sans">
+                                <div className="font-semibold text-white">{c.description}</div>
+                                <div className="text-[10px] text-gray-500 font-mono">Vendor: {c.shopName} | INV: {c.invoiceNumber}</div>
+                              </td>
+                              <td className="py-3 text-slate-100">{c.resourcePerson}</td>
+                              <td className="py-3 text-right font-mono font-bold text-rose-450">
+                                BDT {c.amount.toLocaleString()}
+                              </td>
+                              <td className="py-3 text-center">
+                                {c.invoicePhoto ? (
+                                  <button
+                                    onClick={() => {
+                                      // Popup receipt photo
+                                      setSelectedInvoice({
+                                        invoiceNumber: c.invoiceNumber,
+                                        clientName: "ADMINISTRATIVE RECONCILIATION",
+                                        itemName: `${c.category}: ${c.description} by ${c.resourcePerson}`,
+                                        price: c.amount,
+                                        qty: 1,
+                                        total: c.amount,
+                                        date: c.date,
+                                        status: "Paid",
+                                        isCostAttachment: true,
+                                        photo: c.invoicePhoto
+                                      });
+                                    }}
+                                    className="p-1 hover:text-[#F7931E] hover:bg-white/5 rounded transition-colors inline-flex cursor-pointer"
+                                    title="View receipt attachment photo"
+                                  >
+                                    <ImageIcon className="w-4 h-4 text-emerald-400 mx-auto animate-pulse" />
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-650 text-[10px]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 text-right">
+                                <button
+                                  onClick={() => handleDeleteAdminCost(c.id)}
+                                  className="p-1 hover:bg-red-500/25 text-red-400 rounded transition-colors cursor-pointer inline-flex"
+                                  title="Delete expense item statement"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* INVOICE AUDIT CONTROL CENTER */}
+          {activeTab === "payment_audit" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-extrabold uppercase tracking-tight text-white mb-1">Financial Invoice Auditing Suite</h2>
+                <p className="text-xs text-gray-400">Validate company balances, modify receivables statuses, and execute rigorous tax audits.</p>
+              </div>
+
+              {/* HIGH LEVEL AUDIT STATS LEDGER */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-5 space-y-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Aggregate Outstanding Receivables (DUE)</span>
+                  <div className="text-3xl font-black text-rose-500 font-mono">
+                    BDT {invoices.filter(i => i.status !== "Paid").reduce((acc, curr) => acc + (curr.total || 0), 0).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-sans">
+                    Across {invoices.filter(i => i.status !== "Paid").length} outstanding client accounts
+                  </p>
+                </div>
+
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-5 space-y-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-[#F7931E]">Aggregate Collected Capital (PAID)</span>
+                  <div className="text-3xl font-black text-emerald-400 font-mono">
+                    BDT {invoices.filter(i => i.status === "Paid").reduce((acc, curr) => acc + (curr.total || 0), 0).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-gray-400">
+                    Across {invoices.filter(i => i.status === "Paid").length} successfully audited billing entries
+                  </p>
+                </div>
+
+                <div className="bg-[#091a38] border border-white/10 rounded-2xl p-5 space-y-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Financial Auditor Verification Ratio</span>
+                  <div className="text-3xl font-black text-white font-mono">
+                    {Math.round((invoices.filter(i => i.status === "Paid").length / (invoices.length || 1)) * 100)}%
+                  </div>
+                  <p className="text-[10px] text-gray-400">
+                    Audit compliance targets: 100% clearing status
+                  </p>
+                </div>
+              </div>
+
+              {/* AUDIT MATRIX GRID TABLE */}
+              <div className="bg-[#091a38] border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <span className="text-xs font-black uppercase text-orange-400 tracking-wide font-mono">Interactive Ledger Verification Panel</span>
+                  
+                  {/* Ledger Filters */}
+                  <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-initial">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search Client Name..."
+                        value={auditSearch}
+                        onChange={(e) => setAuditSearch(e.target.value)}
+                        className="bg-black/40 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none w-full md:w-48 placeholder-gray-500"
+                      />
+                    </div>
+
+                    <select
+                      value={auditStatusFilter}
+                      onChange={(e) => setAuditStatusFilter(e.target.value)}
+                      className="bg-black/40 border border-white/10 rounded-xl p-1.5 text-xs text-white focus:outline-none"
+                    >
+                      <option value="All">All statuses (Paid / Due)</option>
+                      <option value="Paid">Marked Paid</option>
+                      <option value="Unpaid">Marked Due</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="border-b border-white/10 text-gray-400 uppercase font-black tracking-wider pb-2">
+                        <th className="py-3">Invoice Number</th>
+                        <th className="py-3">Billed Client Brand</th>
+                        <th className="py-3 font-mono text-center">Invoiced Date</th>
+                        <th className="py-3">Line item descriptions</th>
+                        <th className="py-3 text-right">Sum total</th>
+                        <th className="py-3 text-center">Ledger status</th>
+                        <th className="py-3 text-center">Verify Toggle</th>
+                        <th className="py-3 text-right">Preview A4</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoices.filter(i => {
+                        const matchSearch = i.clientName.toLowerCase().includes(auditSearch.toLowerCase());
+                        const matchStatus = auditStatusFilter === "All" || (auditStatusFilter === "Paid" ? i.status === "Paid" : i.status !== "Paid");
+                        return matchSearch && matchStatus;
+                      }).length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="text-center py-10 text-gray-500 italic">No invoice audit items correspond with current query parameters.</td>
+                        </tr>
+                      ) : (
+                        invoices.filter(i => {
+                          const matchSearch = i.clientName.toLowerCase().includes(auditSearch.toLowerCase());
+                          const matchStatus = auditStatusFilter === "All" || (auditStatusFilter === "Paid" ? i.status === "Paid" : i.status !== "Paid");
+                          return matchSearch && matchStatus;
+                        }).map(i => (
+                          <tr key={i.id} className="border-b border-white/5 hover:bg-white/5 text-gray-300">
+                            <td className="py-3.5 font-mono font-bold text-[#F7931E]">{i.invoiceNumber}</td>
+                            <td className="py-3.5 font-bold uppercase text-white">{i.clientName}</td>
+                            <td className="py-3.5 font-mono text-gray-400 text-center">{i.date}</td>
+                            <td className="py-3.5 font-sans truncate max-w-[200px]" title={i.itemName}>{i.itemName}</td>
+                            <td className="py-3.5 text-right font-mono font-black text-slate-100">
+                              {i.price > 12000 ? `BDT ${i.total?.toLocaleString()}` : `$${i.total?.toLocaleString()}`}
+                            </td>
+                            <td className="py-3.5 text-center">
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border ${
+                                i.status === "Paid" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-500"
+                              }`}>{i.status === "Paid" ? "AUDIT PASSED" : "PENDING CLEARANCE"}</span>
+                            </td>
+                            <td className="py-3.5 text-center">
+                              <button
+                                onClick={() => toggleInvoiceAuditStatus(i.id)}
+                                className={`px-2.5 py-1 text-[8px] font-black uppercase rounded-lg border transition-all cursor-pointer inline-flex items-center gap-1 ${
+                                  i.status === "Paid" ? "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-650 hover:text-white" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600 hover:text-white"
+                                }`}
+                              >
+                                {i.status === "Paid" ? "Revert to Due" : "Clear as Paid"}
+                              </button>
+                            </td>
+                            <td className="py-3.5 text-right">
+                              <button
+                                onClick={() => setSelectedInvoice(i)}
+                                className="p-1.5 bg-orange-600/10 hover:bg-orange-650 border border-orange-500/10 text-orange-400 hover:text-white rounded transition-colors cursor-pointer flex items-center justify-center inline-flex"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
 
       {/* DETAILED CORPORATE INVOICE PRINT-READY MODAL PREVIEW OVERLAY */}
       {selectedInvoice && (
-        <div className="fixed inset-0 z-[10005] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/20 w-full max-w-2xl rounded-3xl p-6 md:p-8 space-y-6 relative overflow-hidden font-sans">
+        <div id="print-zone" className="fixed inset-0 z-[10005] bg-slate-900/95 backdrop-blur-sm overflow-y-auto flex items-start justify-center p-4 md:p-8">
+          
+          {/* Custom style injection for print commands */}
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              body * {
+                visibility: hidden !important;
+              }
+              #printable-a4-invoice, #printable-a4-invoice * {
+                visibility: visible !important;
+              }
+              #printable-a4-invoice {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 1.5cm !important;
+              }
+              .no-print {
+                display: none !important;
+              }
+            }
+          `}} />
+
+          <div className="w-full max-w-4xl space-y-4 my-auto relative">
             
-            <div className="flex justify-between items-start">
-              <div className="space-y-1">
+            {/* Header Control Panel (Not Printed) */}
+            <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-2 no-print">
+              <div className="flex items-center gap-2">
+                <FileText className="text-orange-400 w-5 h-5" />
+                <span className="text-white text-xs font-bold uppercase tracking-wider">A4 Corporate Invoice Preview (White Page Standard)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white font-extrabold text-xs uppercase rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-lg"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Execute Browser Print (PDF)</span>
+                </button>
+                <button
+                  onClick={() => setSelectedInvoice(null)}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 text-white font-extrabold text-xs uppercase rounded-xl transition-all cursor-pointer"
+                >
+                  Close Document
+                </button>
+              </div>
+            </div>
+
+            {/* A4 PAPER CONTAINER */}
+            <div
+              id="printable-a4-invoice"
+              className="w-full max-w-[21cm] min-h-[29.7cm] mx-auto bg-white text-slate-800 border border-slate-300 p-12 md:p-16 relative shadow-2xl flex flex-col justify-between font-sans overflow-hidden aspect-[1/1.414]"
+            >
+              
+              {/* BRAND WATERMARK IN BG */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-0 select-none opacity-[0.06] rotate-[-25deg]">
                 <img
                   src="https://ezydigitalhub.com/wp-content/uploads/2026/04/Logo-1-1.webp"
-                  alt="Ezy Logo"
-                  className="h-7 w-auto object-contain mb-3"
+                  alt="Watermark Brand Logo"
+                  className="w-[11cm] aspect-auto object-contain"
                 />
-                <p className="text-[10px] text-gray-400 font-mono">Ezy Digital Hub Corporate Offices</p>
-                <p className="text-[10px] text-gray-450 font-mono">Baitul Aman Tower, Link Road, Dhaka, Bangladesh</p>
-                <p className="text-[10px] text-gray-450 font-mono">Primary Email: billing@ezydigitalhub.com</p>
               </div>
 
-              <div className="text-right space-y-1">
-                <span className="bg-orange-600/20 border border-orange-500/20 text-[#F7931E] text-[10px] font-mono uppercase font-black px-3 py-1 rounded">
-                  OFFICIAL INVOICE
-                </span>
-                <p className="text-xs font-mono font-bold text-white mt-2">No: {selectedInvoice.invoiceNumber}</p>
-                <p className="text-[10px] text-gray-400 font-mono">Issued: {selectedInvoice.date}</p>
+              {/* INVOICE CONTENT REGION */}
+              <div className="relative z-10 space-y-10 flex-1 flex flex-col justify-between">
+                
+                {/* Upper Letterhead section */}
+                <div className="space-y-6">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1.5 text-left">
+                      <img
+                        src="https://ezydigitalhub.com/wp-content/uploads/2026/04/Logo-1-1.webp"
+                        alt="Ezy Logo"
+                        className="h-10 w-auto object-contain mb-3"
+                      />
+                      <h4 className="text-stone-900 font-extrabold text-sm uppercase tracking-wide">Ezy Digital Hub Ltd.</h4>
+                      <p className="text-[11px] text-gray-400 font-medium leading-relaxed max-w-sm">
+                        Baitul Aman Tower, Level 9, Link Road,<br />
+                        Kuratoli Road, Dhaka, Bangladesh<br />
+                        Tax Registration Reg: BD-9281-2026<br />
+                        Support: billing@ezydigitalhub.com
+                      </p>
+                    </div>
+
+                    <div className="text-right space-y-2">
+                      <div className="inline-block bg-orange-600 text-white font-sans text-xs uppercase font-black px-4 py-1.5 rounded shadow-sm">
+                        OFFICIAL INVOICE
+                      </div>
+                      <p className="text-sm font-mono font-black text-slate-900 mt-2">No: {selectedInvoice.invoiceNumber}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">Date Issued: {selectedInvoice.date}</p>
+                      <div className="mt-2.5">
+                        <span className={`inline-block font-black text-[9px] uppercase tracking-widest px-2.5 py-0.5 rounded border ${
+                          selectedInvoice.status === "Paid" ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-red-50 border-red-300 text-red-700"
+                        }`}>
+                          {selectedInvoice.status === "Paid" ? "Cleared & Paid" : "PENDING CLEARANCE"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bill to divider */}
+                  <div className="border-t border-b border-orange-500/10 py-5 grid grid-cols-2 gap-4 text-xs font-sans text-slate-700 font-medium">
+                    <div>
+                      <span className="text-[9px] text-[#F7931E] uppercase font-black tracking-widest block mb-1">INVOICE PREPARED FOR:</span>
+                      <strong className="text-slate-900 uppercase block text-sm font-black mb-0.5">{selectedInvoice.clientName}</strong>
+                      <p className="text-gray-400 leading-normal font-sans">
+                        Authorized Global Network Partner<br />
+                        Accounts clearance tier-1 status
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] text-[#F7931E] uppercase font-black tracking-widest block mb-1">PAYMENT TERMS:</span>
+                      <p className="text-slate-950 font-bold text-xs font-sans">Standard NET-15 Cycle</p>
+                      <p className="text-gray-400 leading-normal mt-0.5">
+                        Please deliver clearing bank transfer or bKash merchant payload within the stated schedule.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Line Item Table */}
+                <div className="flex-1 space-y-4 pt-4">
+                  <span className="text-[10px] text-[#555] font-black uppercase tracking-widest block">SERVICES BREAKDOWN LEDGER</span>
+                  
+                  <div className="w-full bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    {/* Header */}
+                    <div className="grid grid-cols-12 bg-slate-100 p-3 font-sans text-[10px] text-slate-700 font-black uppercase tracking-wider border-b border-slate-200">
+                      <div className="col-span-6">Specified service segment</div>
+                      <div className="col-span-2 text-center">Unit Price</div>
+                      <div className="col-span-1 text-center">Qty</div>
+                      <div className="col-span-3 text-right">Sum Subtotal</div>
+                    </div>
+
+                    {/* Row item */}
+                    <div className="grid grid-cols-12 p-4 font-sans text-xs text-slate-800 border-b border-slate-200 leading-relaxed font-semibold">
+                      <div className="col-span-6 font-bold text-slate-900 text-left">
+                        {selectedInvoice.itemName}
+                        {selectedInvoice.isCostAttachment && (
+                          <span className="block text-[10px] text-stone-500 mt-1 italic font-normal">Administrative reconciliation review entry</span>
+                        )}
+                      </div>
+                      <div className="col-span-2 text-center font-mono">
+                        {selectedInvoice.price > 12000 ? `BDT ${selectedInvoice.price.toLocaleString()}` : `$${selectedInvoice.price}`}
+                      </div>
+                      <div className="col-span-1 text-center font-bold text-slate-900">{selectedInvoice.qty}</div>
+                      <div className="col-span-3 text-right font-mono font-extrabold text-slate-950">
+                        {selectedInvoice.price > 12000 ? `BDT ${(selectedInvoice.price * selectedInvoice.qty).toLocaleString()}` : `$${selectedInvoice.price * selectedInvoice.qty}`}
+                      </div>
+                    </div>
+
+                    {/* Financial summary tags */}
+                    <div className="p-4 bg-slate-50 font-sans text-xs space-y-2 text-slate-600 border-t border-slate-150">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-500">Service Line Items Subtotal:</span>
+                        <span className="font-mono text-slate-900 font-bold">
+                          {selectedInvoice.price > 12000 ? `BDT ${(selectedInvoice.price * selectedInvoice.qty).toLocaleString()}` : `$${selectedInvoice.price * selectedInvoice.qty}`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-500">Corporate TAX/VAT index (5.00%):</span>
+                        <span className="font-mono text-slate-900 font-bold">
+                          {selectedInvoice.price > 12000 ? `BDT ${Math.round(selectedInvoice.price * selectedInvoice.qty * 0.05).toLocaleString()}` : `$${Math.round(selectedInvoice.price * selectedInvoice.qty * 0.05)}`}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between border-t border-dashed border-slate-300 pt-3.5 font-sans">
+                        <span className="text-[#F7931E] font-black text-[13px] tracking-wide uppercase">NET COMPLIANT GRAND TOTAL:</span>
+                        <span className="font-mono text-[16px] text-[#F7931E] font-black">
+                          {selectedInvoice.price > 12000 ? `BDT ${selectedInvoice.total?.toLocaleString()}` : `$${selectedInvoice.total}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Display embedded receipt photo if exists! */}
+                  {selectedInvoice.photo && (
+                    <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 no-print">
+                      <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest block">EMBEDDED COSTING RECEIPT PREVIEW (LOCAL RETRIEVAL)</span>
+                      <div className="flex items-center justify-center bg-stone-100 rounded-lg p-2.5 max-h-[300px] overflow-hidden">
+                        <img
+                          src={selectedInvoice.photo}
+                          alt="Cost physical proof"
+                          className="max-h-[280px] w-auto object-contain rounded-md"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Bottom letterhead footer address details */}
+                <div className="border-t border-slate-200 pt-8 flex justify-between items-end">
+                  <div className="space-y-1 text-left">
+                    <p className="text-[10px] font-sans text-slate-400 leading-normal">
+                      * This document is generated live from the Ezy Digital Hub financial ledgers.<br />
+                      Validating secure signature not required. All records are reconciled & cataloged.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-sans text-slate-500 font-black uppercase tracking-wider font-bold">PREPARED BY:</p>
+                    <div className="h-0.5 w-24 bg-slate-350 my-1 ml-auto"></div>
+                    <p className="text-[10px] text-orange-600 font-black uppercase font-mono tracking-widest">EZY FINANCE PORTAL</p>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* DETAILED ADMINISTRATIVE COSTING MONTHLY REPORT PRINT-READY OVERLAY */}
+      {printCostReport && (
+        <div id="print-zone-report" className="fixed inset-0 z-[10005] bg-slate-900/95 backdrop-blur-sm overflow-y-auto flex items-start justify-center p-4 md:p-8">
+          
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              body * {
+                visibility: hidden !important;
+              }
+              #printable-a4-report, #printable-a4-report * {
+                visibility: visible !important;
+              }
+              #printable-a4-report {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 1.5cm !important;
+              }
+              .no-print {
+                display: none !important;
+              }
+            }
+          `}} />
+
+          <div className="w-full max-w-4xl space-y-4 my-auto relative">
+            
+            {/* Control Panel (Not Printed) */}
+            <div className="bg-[#091a38] border border-white/10 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-2 no-print">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="text-teal-400 w-5 h-5 animate-pulse" />
+                <span className="text-white text-xs font-bold uppercase tracking-widest">Cost Reconciliation Statement Printable Generator</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Target Month Filter:</span>
+                <select
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="bg-black/65 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                >
+                  <option value="All">All recorded Expenditures</option>
+                  {Array.from(new Set(adminCosts.map(c => c.date.substring(0, 7)))).sort().reverse().map((m: any) => {
+                    const [year, month] = m.split("-");
+                    const dateObj = new Date(Number(year), Number(month) - 1, 1);
+                    const formattedMonth = dateObj.toLocaleString("en-US", { month: "long", year: "numeric" });
+                    return <option key={m} value={m}>{formattedMonth}</option>;
+                  })}
+                </select>
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-lg"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Execute Print</span>
+                </button>
+                <button
+                  onClick={() => setPrintCostReport(false)}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10 text-white font-extrabold text-xs uppercase rounded-xl transition-all cursor-pointer"
+                >
+                  Close
+                </button>
               </div>
             </div>
 
-            <div className="border-t border-b border-white/10 py-4 grid grid-cols-2 gap-4 text-xs font-mono text-gray-300">
-              <div>
-                <span className="text-[9px] text-[#F7931E] uppercase font-bold block mb-1">Invoice Prepared For:</span>
-                <strong className="text-white uppercase block text-sm">{selectedInvoice.clientName}</strong>
-                <span>Verified client network partner</span>
+            {/* A4 REPORT CONTAINER */}
+            <div
+              id="printable-a4-report"
+              className="w-full max-w-[21cm] min-h-[29.7cm] mx-auto bg-white text-slate-800 border border-slate-300 p-12 md:p-16 relative shadow-2xl flex flex-col justify-between font-sans overflow-hidden"
+            >
+              
+              {/* CENTERED WATERMARK */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-0 select-none opacity-[0.05] rotate-[-25deg]">
+                <img
+                  src="https://ezydigitalhub.com/wp-content/uploads/2026/04/Logo-1-1.webp"
+                  alt="Watermark brand"
+                  className="w-[12cm] aspect-auto object-contain"
+                />
               </div>
-              <div className="text-right">
-                <span className="text-[9px] text-[#F7931E] uppercase font-bold block mb-1">Terms & Status:</span>
-                <p className="text-xs">NET-15 days grace cycle</p>
-                <span className={`inline-block font-bold mt-1 text-[9px] px-2 py-0.5 rounded border ${
-                  selectedInvoice.status === "Paid" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"
-                }`}>{selectedInvoice.status}</span>
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              <span className="text-[9px] text-gray-400 uppercase font-black block tracking-wider">Item Breakdown Ledger</span>
-              <div className="bg-black/35 rounded-xl border border-white/5 overflow-hidden">
-                <div className="grid grid-cols-12 bg-white/5 p-2 font-mono text-[10px] text-gray-300 font-bold uppercase">
-                  <div className="col-span-6">Services description line item</div>
-                  <div className="col-span-2 text-center">Unit cost</div>
-                  <div className="col-span-1 text-center">Qty</div>
-                  <div className="col-span-3 text-right">Sum</div>
+              {/* REPORT CARD */}
+              <div className="relative z-10 space-y-10 flex-grow flex flex-col justify-between">
+                
+                {/* Header letterhead detail */}
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1 text-left">
+                    <img
+                      src="https://ezydigitalhub.com/wp-content/uploads/2026/04/Logo-1-1.webp"
+                      alt="Watermark"
+                      className="h-9 w-auto object-contain mb-2"
+                    />
+                    <h3 className="text-stone-900 font-extrabold text-xs uppercase tracking-widest">EZY DIGITAL HUB LIMITED</h3>
+                    <p className="text-[10px] text-slate-500 leading-normal font-medium">
+                      Administrative Costing Reconciliation Center<br />
+                      Baitul Aman Tower, Dhaka, Bangladesh | finance@ezydigitalhub.com
+                    </p>
+                  </div>
+
+                  <div className="text-right space-y-1">
+                    <span className="bg-slate-900 text-white font-black text-[9px] uppercase tracking-widest px-3 py-1 rounded">
+                      COST AUDIT STATEMENT
+                    </span>
+                    <p className="text-[11px] font-mono font-bold text-slate-900 mt-2">
+                      Statement Month: <strong className="text-[#F7931E] uppercase">{filterMonth === "All" ? "ALL HISTORY" : filterMonth}</strong>
+                    </p>
+                    <p className="text-[9px] font-mono text-slate-500 font-sans">Report Compiled: {new Date().toISOString().substring(0, 10)}</p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-12 p-3 font-mono text-xs text-gray-205 border-b border-white/5">
-                  <div className="col-span-6 font-sans text-white">{selectedInvoice.itemName}</div>
-                  <div className="col-span-2 text-center">
-                    {selectedInvoice.price > 12000 ? `${selectedInvoice.price.toLocaleString()}` : `$${selectedInvoice.price}`}
+                {/* Ledger Listing */}
+                <div className="flex-grow space-y-4">
+                  <div className="border-b border-slate-300 pb-2">
+                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest block">ADMIN OPERATING EXPENDITURE REGISTRY INDEX</span>
                   </div>
-                  <div className="col-span-1 text-center font-bold">{selectedInvoice.qty}</div>
-                  <div className="col-span-3 text-right font-black text-white">
-                    {selectedInvoice.price > 12000 ? `${(selectedInvoice.price * selectedInvoice.qty).toLocaleString()}` : `$${selectedInvoice.price * selectedInvoice.qty}`}
+
+                  <div className="w-full bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    {/* Columns header */}
+                    <div className="grid grid-cols-12 bg-slate-100 p-2 text-[9px] text-slate-700 font-black uppercase tracking-wider border-b border-slate-200">
+                      <div className="col-span-2">Date</div>
+                      <div className="col-span-2">Spent Tag</div>
+                      <div className="col-span-4">Spent line descriptions</div>
+                      <div className="col-span-2">Resource Person</div>
+                      <div className="col-span-2 text-right">Debit (BDT)</div>
+                    </div>
+
+                    {/* Spent row listing */}
+                    {adminCosts.filter(c => filterMonth === "All" || c.date.substring(0, 7) === filterMonth).length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 italic text-xs">
+                        No financial record entries correspond with the target period.
+                      </div>
+                    ) : (
+                      adminCosts.filter(c => filterMonth === "All" || c.date.substring(0, 7) === filterMonth).map(c => (
+                        <div key={c.id} className="grid grid-cols-12 p-3 font-sans text-xs text-slate-800 border-b border-slate-150 leading-relaxed font-semibold">
+                          <div className="col-span-2 font-mono text-slate-500 text-[11px]">{c.date}</div>
+                          <div className="col-span-2">
+                            <span className="bg-stone-100 text-[#F7931E] text-[9px] px-1.5 py-0.5 rounded font-black border border-stone-250 whitespace-nowrap">
+                              {c.category}
+                            </span>
+                          </div>
+                          <div className="col-span-4 text-slate-900 text-left">
+                            <div>{c.description}</div>
+                            <span className="text-[9px] text-gray-500 font-mono block">Vendor: {c.shopName} | Invoice: {c.invoiceNumber}</span>
+                          </div>
+                          <div className="col-span-2 font-sans text-slate-650">{c.resourcePerson}</div>
+                          <div className="col-span-2 text-right font-mono font-black text-rose-650">
+                            BDT {c.amount.toLocaleString()}
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {/* Report Aggregate cost */}
+                    <div className="p-4 bg-slate-100/50 font-sans text-xs flex justify-between items-center border-t border-slate-200">
+                      <span className="text-[#F7931E] font-black text-[11px] tracking-wide uppercase">TOTAL DEBIT BALANCE ACCUMULATED:</span>
+                      <span className="font-mono text-sm font-black text-[#F7931E]">
+                        BDT {adminCosts.filter(c => filterMonth === "All" || c.date.substring(0, 7) === filterMonth).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}
+                      </span>
+                    </div>
+
                   </div>
                 </div>
 
-                <div className="bg-white/5 p-3.5 font-mono text-xs space-y-1 text-gray-400">
-                  <div className="flex justify-between">
-                    <span>Aggregate Subtotal:</span>
-                    <span className="text-white">
-                      {selectedInvoice.price > 12000 ? `BDT ${(selectedInvoice.price * selectedInvoice.qty).toLocaleString()}` : `$${selectedInvoice.price * selectedInvoice.qty}`}
-                    </span>
+                {/* Final letterhead footer */}
+                <div className="border-t border-slate-200 pt-8 flex justify-between items-end">
+                  <div className="space-y-1 text-left">
+                    <p className="text-[10px] font-sans text-slate-400 leading-normal">
+                      * Validated automatically via Ezy Digital Sandbox CRM Finance Center.<br />
+                      This cost audit acts as secure documentation. Unsigned copies remain legally compliant.
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Corporate TAX/VAT index (5.00%):</span>
-                    <span className="text-white">
-                      {selectedInvoice.price > 12000 ? `BDT ${Math.round(selectedInvoice.price * selectedInvoice.qty * 0.05).toLocaleString()}` : `$${Math.round(selectedInvoice.price * selectedInvoice.qty * 0.05)}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-t border-white/10 pt-2 font-black text-sm">
-                    <span className="text-orange-400">NET GRAND TOTAL:</span>
-                    <span className="text-[#F7931E]">
-                      {selectedInvoice.price > 12000 ? `BDT ${selectedInvoice.total?.toLocaleString()}` : `$${selectedInvoice.total}`}
-                    </span>
+                  <div className="text-right">
+                    <p className="text-[10px] font-sans text-slate-500 font-extrabold uppercase tracking-wider font-bold">APPROVED BY:</p>
+                    <div className="h-0.5 w-24 bg-slate-350 my-1 ml-auto"></div>
+                    <p className="text-[10px] text-orange-600 font-black uppercase font-mono tracking-widest font-bold">EZY AUDIT LEDGER</p>
                   </div>
                 </div>
+
               </div>
-            </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-white/10 text-[9.5px] text-gray-500 font-mono leading-relaxed">
-              <span>* Generated automatically via Ezy Digital Sandbox CRM. Approved signature not requested.</span>
-              <button
-                onClick={() => setSelectedInvoice(null)}
-                className="px-5 py-2.5 bg-white/10 hover:bg-white/15 border border-white/10 text-white rounded-xl text-xs font-black uppercase cursor-pointer transition-colors"
-              >
-                Close Invoice View
-              </button>
             </div>
 
           </div>
